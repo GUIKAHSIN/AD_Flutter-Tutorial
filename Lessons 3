@@ -1,0 +1,438 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class Student {
+  String name;
+  String matricNo;
+  String course;
+  String gender;
+
+  Student({
+    required this.name,
+    required this.matricNo,
+    required this.course,
+    required this.gender,
+  });
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Student Record App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const StudentPage(),
+    );
+  }
+}
+
+class StudentPage extends StatefulWidget {
+  const StudentPage({super.key});
+
+  @override
+  State<StudentPage> createState() => _StudentPageState();
+}
+
+class _StudentPageState extends State<StudentPage> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController matricController = TextEditingController();
+  final TextEditingController courseController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
+  String? selectedGender; 
+
+  final List<Student> students = [];
+
+  bool isEditing = false;
+  int editingIndex = -1;
+
+  List<Student> getFilteredStudents() {
+    String query = searchController.text.toLowerCase();
+
+    if (query.isEmpty) {
+      return students;
+    }
+
+    return students.where((student) {
+      return student.name.toLowerCase().contains(query) ||
+          student.matricNo.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  void addOrUpdateStudent() {
+    final String name = nameController.text.trim();
+    final String matricNo = matricController.text.trim();
+    final String course = courseController.text.trim();
+
+    List<String> errors = []; // store all errors
+
+    if (name.isEmpty || matricNo.isEmpty || course.isEmpty) {
+      showMessage('Please fill in all fields');
+      return;
+    }
+
+    if (selectedGender == null) {
+      errors.add('Please select gender');
+    }
+
+      // RULE 1: Matric number must be at least 5 characters
+    // if (matricNo.length < 5) {
+    //   showMessage('Matric number must be at least 5 characters');
+    //   return;
+    // }
+
+    // RULE 2: Course must NOT contain numbers
+    // bool hasNumber = RegExp(r'\d').hasMatch(course);
+    // if (hasNumber) {
+    //   showMessage('Course must not contain numbers');
+    //   return;
+    // }
+
+     // Rule 1: Matric length
+    if (matricNo.isNotEmpty && matricNo.length < 5) {
+      errors.add('Matric number must be at least 5 characters');
+    }
+
+    // Rule 2: Course no numbers
+    if (course.isNotEmpty && RegExp(r'\d').hasMatch(course)) {
+      errors.add('Course must not contain numbers');
+    }
+
+    // If any errors exist → show ALL
+    if (errors.isNotEmpty) {
+      showMessage(errors.join('\n')); // combine messages
+      return;
+    }
+
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(name)) {
+      showMessage('Name must contain only letters');
+      return;
+    }
+
+    if (isEditing) {
+      updateStudent(name, matricNo, course);
+    } else {
+      addStudent(name, matricNo, course);
+    }
+  }
+
+  void addStudent(String name, String matricNo, String course) {
+    bool isDuplicate = students.any(
+      (student) => student.matricNo.toLowerCase() == matricNo.toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      showMessage('Matric number already exists');
+      return;
+    }
+
+    setState(() {
+      students.add(
+        Student(
+          name: name,
+          matricNo: matricNo,
+          course: course,
+          gender: selectedGender!,
+        ),
+      );
+    });
+
+    clearFields();
+    showMessage('Student added successfully');
+  }
+
+  void editStudent(int index) {
+    final Student student = students[index];
+
+    setState(() {
+      nameController.text = student.name;
+      matricController.text = student.matricNo;
+      courseController.text = student.course;
+      selectedGender = student.gender;
+
+      isEditing = true;
+      editingIndex = index;
+    });
+  }
+
+  void updateStudent(String name, String matricNo, String course) {
+    if (editingIndex < 0 || editingIndex >= students.length) {
+      showMessage('Invalid student selected');
+      return;
+    }
+
+    bool isDuplicate = students.asMap().entries.any(
+      (entry) =>
+          entry.key != editingIndex &&
+          entry.value.matricNo.toLowerCase() == matricNo.toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      showMessage('Matric number already exists');
+      return;
+    }
+
+    setState(() {
+      students[editingIndex].name = name;
+      students[editingIndex].matricNo = matricNo;
+      students[editingIndex].course = course;
+      students[editingIndex].course = selectedGender!;
+
+      isEditing = false;
+      editingIndex = -1;
+    });
+
+    clearFields();
+    showMessage('Student updated successfully');
+  }
+
+  void cancelEdit() {
+    setState(() {
+      isEditing = false;
+      editingIndex = -1;
+    });
+
+    clearFields();
+  }
+
+  void clearFields() {
+    nameController.clear();
+    matricController.clear();
+    courseController.clear();
+
+    setState(() {
+      selectedGender = null;
+    });
+  }
+
+  void deleteStudent(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this student?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); 
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                students.removeAt(index);
+
+                if (isEditing && editingIndex == index) {
+                  isEditing = false;
+                  editingIndex = -1;
+                  clearFields();
+                } else if (isEditing && editingIndex > index) {
+                  editingIndex--;
+                }
+              });
+
+              Navigator.pop(context); //  Close dialog
+              showMessage('Student deleted');
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red), // optional styling
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    matricController.dispose();
+    courseController.dispose();
+    searchController.dispose(); 
+    super.dispose();
+  }
+
+  Widget buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          labelText: label,
+          prefixIcon: Icon(icon),
+        ),
+      ),
+    );
+  }
+
+  Widget buildStudentCard(Student student, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 3,
+      child: ListTile(
+        leading: const CircleAvatar(
+          child: Icon(Icons.person),
+        ),
+        title: Text(student.name),
+        subtitle: Text(
+          'Matric No: ${student.matricNo}\nCourse: ${student.course}\nGender: ${student.gender}',
+        ),
+        isThreeLine: true,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: () => editStudent(index),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => deleteStudent(index),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredStudents = getFilteredStudents(); 
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Student Record App'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            buildTextField(
+              controller: nameController,
+              label: 'Student Name',
+              icon: Icons.person,
+            ),
+            buildTextField(
+              controller: matricController,
+              label: 'Matric Number',
+              icon: Icons.badge,
+            ),
+            buildTextField(
+              controller: courseController,
+              label: 'Course',
+              icon: Icons.school,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: DropdownButtonFormField<String>(
+                value: selectedGender,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Gender',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Male', child: Text('Male')),
+                  DropdownMenuItem(value: 'Female', child: Text('Female')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    selectedGender = value;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: addOrUpdateStudent,
+                    child: Text(
+                      isEditing ? 'Update Student' : 'Add Student',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isEditing ? cancelEdit : clearFields,
+                    child: Text(
+                      isEditing ? 'Cancel Edit' : 'Clear',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            TextField(
+              controller: searchController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Search by Name or Matric No',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                setState(() {}); // refresh UI when typing
+              },
+            ),
+
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Student List (${students.length})',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            Expanded(
+              child: filteredStudents.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No matching students found',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filteredStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = filteredStudents[index];
+                        final originalIndex = students.indexOf(student);
+
+                        return buildStudentCard(student, originalIndex);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
